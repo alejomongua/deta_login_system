@@ -1,13 +1,12 @@
-"""Users model"""
-import json
-import os
-import secrets
-import time
-
-from deta import Deta
-
-import passwords
 import manage_tokens
+import passwords
+from deta import Deta
+import time
+import secrets
+import os
+import json
+f"""Users model"""
+
 
 TWO_WEEKS = 60 * 60 * 24 * 14
 THIS_FILE_DIR = '/'.join(os.path.realpath(__file__).split('/')[0:-1])
@@ -94,22 +93,11 @@ class User():
 
         return decoded_token
 
-    def expire_token(self, token):
+    def expire_token(self):
         """Expires token, for example, for logout"""
-        decoded_token = manage_tokens.decode(token)
-        self.user_in_db = User.users_db.get(decoded_token['email'])
+        self.user_in_db = User.users_db.get(self.email)
 
-        if not self.user_in_db:
-            # User does not exist
-            return {'error': 'User does not exist'}
-
-        if self.user_in_db['token'] != decoded_token['token']:
-            return {'error': 'Token is invalid'}
-
-        if decoded_token['expires'] < time.time():
-            return {'error': 'Token is expired'}
-
-        self.user_in_db.update({'token': token})
+        self.user_in_db.update({'token': ''})
 
         User.users_db.put(self.user_in_db)
 

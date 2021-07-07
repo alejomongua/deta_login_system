@@ -38,12 +38,24 @@ def users_authenticate(email: str, password: str, response: Response):
     return response1
 
 
-@app.get('/restricted_path', status_code=403)
-def restricted_resource(authorization: Optional[str] = Header(None)):
+@app.delete('/users/login', status_code=403)
+def users_logout(response: Response, authorization: Optional[str] = Header(None)):
     output = verify_token(authorization)
     if 'error' in output:
         return output
 
+    response.status_code = 200
+    user = User(output['email'])
+    return user.expire_token()
+
+
+@app.get('/restricted_path', status_code=403)
+def restricted_resource(response: Response, authorization: Optional[str] = Header(None)):
+    output = verify_token(authorization)
+    if 'error' in output:
+        return output
+
+    response.status_code = 200
     return {'secret': 'unclassified'}
 
 
