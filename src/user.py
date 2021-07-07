@@ -1,18 +1,25 @@
 """Users model"""
+import json
+import os
 import secrets
 import time
 
-import deta
+from deta import Deta
 
 import passwords
 import manage_tokens
 
 TWO_WEEKS = 60 * 60 * 24 * 14
+THIS_FILE_DIR = '/'.join(os.path.realpath(__file__).split('/')[0:-1])
+with open(f'{THIS_FILE_DIR}/secrets.json') as jsonfile:
+    PROJECT_SECRET = json.load(jsonfile)['project']
+
 
 class User():
     """Main user model class"""
+    deta = Deta(PROJECT_SECRET)
     users_db = deta.Base('users_main')
-    
+
     def __init__(self, email, password=''):
         self.email = email
         self.password = password
@@ -41,7 +48,8 @@ class User():
             return {'error': 'Invalid email and password combination'}
 
         stored_password = self.user_in_db['password']
-        password_valid = passwords.verify_password(self.password, stored_password)
+        password_valid = passwords.verify_password(
+            self.password, stored_password)
 
         if not password_valid:
             # Invalid password
@@ -69,6 +77,9 @@ class User():
     def check_token(self, token):
         """Checks if a token is valid"""
         decoded_token = manage_tokens.decode(token)
+        if decoded_token is None:
+            return {'error': 'Token is invalid'}
+
         self.user_in_db = User.users_db.get(decoded_token['email'])
 
         if not self.user_in_db:
@@ -78,7 +89,7 @@ class User():
         if self.user_in_db['token'] != decoded_token['token']:
             return {'error': 'Token is invalid'}
 
-        if decoded_token['expires'] > time.time():
+        if decoded_token['expires'] < time.time():
             return {'error': 'Token is expired'}
 
         return decoded_token
@@ -95,7 +106,7 @@ class User():
         if self.user_in_db['token'] != decoded_token['token']:
             return {'error': 'Token is invalid'}
 
-        if decoded_token['expires'] > time.time():
+        if decoded_token['expires'] < time.time():
             return {'error': 'Token is expired'}
 
         self.user_in_db.update({'token': token})

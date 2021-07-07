@@ -1,16 +1,20 @@
-from fastapi import FastAPI, Response
+from typing import Optional
+from fastapi import FastAPI, Response, Header
 
 from user import User
 
 app = FastAPI()
 
+
 @app.get("/")
 def read_root():
     return {"Hello": "World"}
 
+
 @app.get("/items/{item_id}")
 def read_item(item_id: int):
     return {"item_id": item_id}
+
 
 @app.post("/users", status_code=201)
 def users_create(email: str, password: str, response: Response):
@@ -22,6 +26,7 @@ def users_create(email: str, password: str, response: Response):
 
     return response1
 
+
 @app.post("/users/login")
 def users_authenticate(email: str, password: str, response: Response):
     """Identifies user already registered"""
@@ -31,3 +36,27 @@ def users_authenticate(email: str, password: str, response: Response):
         response.status_code = 403
 
     return response1
+
+
+@app.get('/restricted_path', status_code=403)
+def restricted_resource(authorization: Optional[str] = Header(None)):
+    output = verify_token(authorization)
+    if 'error' in output:
+        return output
+
+    return {'secret': 'unclassified'}
+
+
+def verify_token(authorization: str):
+    """Verify authorization header to check if token is valid"""
+    if authorization is None:
+        return {'error': 'No authentication header found'}
+
+    if not authorization.startswith('Bearer '):
+        return {'error': 'Authentication header invalid'}
+
+    token = authorization[7:]
+
+    user = User('')
+
+    return user.check_token(token)
