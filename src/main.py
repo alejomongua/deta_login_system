@@ -1,7 +1,8 @@
 from typing import Optional
 from fastapi import FastAPI, Response, Header
+from pydantic import Field
 
-from user import User
+from user import User, UserBaseModel
 
 app = FastAPI()
 
@@ -17,9 +18,9 @@ def read_item(item_id: int):
 
 
 @app.post("/users", status_code=201)
-def users_create(email: str, password: str, response: Response):
+def users_create(user: UserBaseModel, response: Response):
     """Register a user into the database"""
-    new_user = User(email, password)
+    new_user = User(user.email, user.password)
     response1 = new_user.insert()
     if 'error' in response1:
         response.status_code = 403
@@ -28,9 +29,9 @@ def users_create(email: str, password: str, response: Response):
 
 
 @app.post("/users/login")
-def users_authenticate(email: str, password: str, response: Response):
+def users_authenticate(user: UserBaseModel, response: Response):
     """Identifies user already registered"""
-    new_user = User(email, password)
+    new_user = User(user.email, user.password)
     response1 = new_user.authenticate()
     if 'error' in response1:
         response.status_code = 403
@@ -39,7 +40,7 @@ def users_authenticate(email: str, password: str, response: Response):
 
 
 @app.delete('/users/login', status_code=403)
-def users_logout(response: Response, authorization: Optional[str] = Header(None)):
+def users_login(response: Response, authorization: Optional[str] = Header(None)):
     output = verify_token(authorization)
     if 'error' in output:
         return output
@@ -47,6 +48,25 @@ def users_logout(response: Response, authorization: Optional[str] = Header(None)
     response.status_code = 200
     user = User(output['email'])
     return user.expire_token()
+
+
+@app.post('/users/forgot_password', status_code=200)
+def users_forgot_password(email: str):
+    user = User(email)
+
+    user.recover_password()
+
+    return {'message': 'If email is registered, a recovery email was sent'}
+
+
+@app.get('/users/recover_password', status_code=200)
+def users_recovery_password(email: str, token: str, response: Response):
+    user = User(email)
+    response1 = user.verify_recover_password(token)
+    if 'error' in response1:
+        response.status_code = 403
+
+    return response1
 
 
 @app.get('/restricted_path', status_code=403)
