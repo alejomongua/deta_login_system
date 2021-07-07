@@ -23,31 +23,34 @@ class UserBaseModel(BaseModel):
     password: Optional[str] = None
 
 
+class NewPassword(BaseModel):
+    new_password: Optional[str] = None
+
+
 class User():
     """Main user model class"""
     deta = Deta(PROJECT_SECRET)
     users_db = deta.Base('users_main')
 
-    def __init__(self, email, password=''):
+    def __init__(self, email):
         self.email = email
-        self.password = password
         self.user_in_db = None
         self.is_verified = False
 
-    def insert(self):
+    def insert(self, password):
         """Inserts user into database if does not exist"""
         self.user_in_db = User.users_db.get(self.email)
         if self.user_in_db:
             return {'error': 'User already exists'}
 
-        password = passwords.encode_password(self.password)
+        password = passwords.encode_password(password)
 
         self.user_in_db = {'key': self.email, 'password': password}
         User.users_db.insert(self.user_in_db)
 
         return {'success': True}
 
-    def authenticate(self):
+    def authenticate(self, password):
         """Authenticates user with login and password"""
 
         self.user_in_db = User.users_db.get(self.email)
@@ -55,13 +58,9 @@ class User():
             # User does not exist
             return {'error': 'Invalid email and password combination'}
 
-        stored_password = self.user_in_db['password']
-        password_valid = passwords.verify_password(
-            self.password, stored_password)
-
-        if not password_valid:
-            # Invalid password
-            return {'error': 'Invalid email and password combination'}
+        output = self.verify_password(password)
+        if 'error' in output:
+            return output
 
         return {'token': self.generate_jwt()}
 
@@ -75,6 +74,7 @@ class User():
                 or 'token' not in decoded_token:
             return {'error': 'Token is invalid'}
 
+        self.email = decoded_token['email']
         self.user_in_db = User.users_db.get(decoded_token['email'])
 
         if not self.user_in_db:
@@ -99,16 +99,21 @@ class User():
 
         return {'success': True}
 
-    def update_password(self, new_password: str):
+    def update_password(self, old_password: str, new_password: str):
         """Updates user's password"""
         self.user_in_db = User.users_db.get(self.email)
         if not self.user_in_db:
             # User does not exist
             return {'error': 'User does not exists'}
 
-        password = passwords.encode_password(self.password)
+        output = self.verify_password(old_password)
+        if 'error' in output:
+            return output
+
+        password = passwords.encode_password(new_password)
 
         self.user_in_db.update({'password': password})
+        User.users_db.put(self.user_in_db)
 
         return {'success': True}
 
@@ -166,3 +171,15 @@ class User():
             'generated': generated,
             'expires': expires,
         })
+
+    def verify_password(self, password):
+        """Checks if input password matches"""
+        stored_password = self.user_in_db['password']
+        password_valid = passwords.verify_password(
+            password, stored_password)
+
+        if not password_valid:
+            # Invalid password
+            return {'error': 'Invalid email and password combination'}
+
+        return {'success': True}

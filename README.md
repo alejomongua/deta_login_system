@@ -30,10 +30,10 @@ La base de datos es deta base
 
 ## To do
 
-* Cambiar password
-
 * Validar complejidad del password
 
 * Validar formato del email
 
 * Verificar email (enviar enlace de verificación y no permitir el login hasta que esté verificado)
+
+* Solucionar hueco de seguridad: Al recuperar el acceso con un token se puede seguir usando el mismo enlace
