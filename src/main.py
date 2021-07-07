@@ -1,6 +1,5 @@
 from typing import Optional
 from fastapi import FastAPI, Response, Header
-from pydantic import Field
 
 from user import User, UserBaseModel
 
@@ -50,6 +49,29 @@ def users_login(response: Response, authorization: Optional[str] = Header(None))
     return user.expire_token()
 
 
+@app.get('/users/check_token', status_code=403)
+def users_login(response: Response, authorization: Optional[str] = Header(None)):
+    output = verify_token(authorization)
+    if 'error' in output:
+        return output
+
+    # Change default response code
+    response.status_code = 200
+
+    # Get user
+    user = output['user']
+
+    # Remove sensitive data
+    user.user_in_db.pop('password')
+    user.user_in_db.pop('token')
+
+    # Rename key to email
+    user.user_in_db['email'] = user.user_in_db.pop('key')
+
+    # Return user
+    return user.user_in_db
+
+
 @app.post('/users/forgot_password', status_code=200)
 def users_forgot_password(email: str):
     user = User(email)
@@ -91,4 +113,9 @@ def verify_token(authorization: str):
 
     user = User('')
 
-    return user.check_token(token)
+    output = user.check_token(token)
+
+    if 'error' in output:
+        return output
+
+    return {'user': user}
