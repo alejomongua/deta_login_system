@@ -3,17 +3,17 @@ from fastapi import FastAPI, Response, Header
 
 from user import User, UserBaseModel
 
-app = FastAPI()
+app = FastAPI(
+    title="Login system",
+    description="This is test of what I can do using Deta Micros and Deta Base",
+    version="0.0.1",
+)
 
 
 @app.get("/")
 def read_root():
+    """Demo of a public route"""
     return {"Hello": "World"}
-
-
-@app.get("/items/{item_id}")
-def read_item(item_id: int):
-    return {"item_id": item_id}
 
 
 @app.post("/users", status_code=201)
@@ -39,7 +39,8 @@ def users_authenticate(user: UserBaseModel, response: Response):
 
 
 @app.delete('/users/login', status_code=403)
-def users_login(response: Response, authorization: Optional[str] = Header(None)):
+def users_logout(response: Response, authorization: Optional[str] = Header(None)):
+    """Logs out user, invalidates token"""
     output = verify_token(authorization)
     if 'error' in output:
         return output
@@ -50,7 +51,8 @@ def users_login(response: Response, authorization: Optional[str] = Header(None))
 
 
 @app.get('/users/check_token', status_code=403)
-def users_login(response: Response, authorization: Optional[str] = Header(None)):
+def users_check_token(response: Response, authorization: Optional[str] = Header(None)):
+    """Check if token is valid and it's not expired"""
     output = verify_token(authorization)
     if 'error' in output:
         return output
@@ -74,6 +76,7 @@ def users_login(response: Response, authorization: Optional[str] = Header(None))
 
 @app.post('/users/forgot_password', status_code=200)
 def users_forgot_password(email: str):
+    """Sends an email to recover access"""
     user = User(email)
 
     user.recover_password()
@@ -83,6 +86,7 @@ def users_forgot_password(email: str):
 
 @app.get('/users/recover_password', status_code=200)
 def users_recovery_password(email: str, token: str, response: Response):
+    """Recover access through an email"""
     user = User(email)
     response1 = user.verify_recover_password(token)
     if 'error' in response1:
@@ -93,6 +97,8 @@ def users_recovery_password(email: str, token: str, response: Response):
 
 @app.get('/restricted_path', status_code=403)
 def restricted_resource(response: Response, authorization: Optional[str] = Header(None)):
+    """Demo of a private route"""
+
     output = verify_token(authorization)
     if 'error' in output:
         return output
