@@ -30,10 +30,8 @@ La base de datos es deta base
 
 ## To do
 
-* Validar complejidad del password
+* Al enviar email de recuperación de acceso permitir ingresar la url de destino
 
-* Validar formato del email
-
-* Verificar email (enviar enlace de verificación y no permitir el login hasta que esté verificado)
+* Permitir resetear el password sin tener el password actual
 
 * Solucionar hueco de seguridad: Al recuperar el acceso con un token se puede seguir usando el mismo enlace

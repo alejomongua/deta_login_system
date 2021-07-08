@@ -1,4 +1,5 @@
 from typing import Optional
+from starlette.responses import RedirectResponse
 from fastapi import FastAPI, Response, Header
 
 from user import User, UserBaseModel, NewPassword
@@ -17,10 +18,10 @@ def read_root():
 
 
 @app.post("/users", status_code=201)
-def users_create(user: UserBaseModel, response: Response):
+def users_create(user: UserBaseModel, response: Response, redirect_to: Optional[str] = ''):
     """Register a user into the database"""
     new_user = User(user.email)
-    response1 = new_user.insert(user.password)
+    response1 = new_user.insert(user.password, redirect_to)
     if 'error' in response1:
         response.status_code = 403
 
@@ -84,6 +85,16 @@ def users_forgot_password(email: str):
     return {'message': 'If email is registered, a recovery email was sent'}
 
 
+@app.post('/users/resend_validation_email')
+def users_resend_validation_email(email: str, redirect_to: Optional[str] = ''):
+    """Sends an email to recover access"""
+    user = User(email)
+
+    user.send_verify_email(redirect_to)
+
+    return {'message': 'If email is registered and user is not already verified, an email was sent'}
+
+
 @app.get('/users/recover_password')
 def users_recovery_password(email: str, token: str, response: Response):
     """Recover access through an email"""
@@ -93,6 +104,21 @@ def users_recovery_password(email: str, token: str, response: Response):
         response.status_code = 403
 
     return response1
+
+
+@app.get('/users/validate_email')
+def users_validate_email(email: str, token: str, response: Response):
+    """Recover access through an email"""
+    user = User(email)
+    response1 = user.validate_email(token)
+    if 'error' in response1:
+        response.status_code = 403
+        return response1
+
+    if 'redirect_to' in response1 and response1['redirect_to']:
+        return RedirectResponse(url=response1['redirect_to'])
+
+    return {'success': True}
 
 
 @app.post('/users/update_password', status_code=200)

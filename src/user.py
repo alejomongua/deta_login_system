@@ -1,3 +1,4 @@
+import re
 from typing import Optional
 from pydantic.main import BaseModel
 import email_sender
@@ -17,6 +18,9 @@ THIS_FILE_DIR = '/'.join(os.path.realpath(__file__).split('/')[0:-1])
 with open(f'{THIS_FILE_DIR}/secrets.json') as jsonfile:
     PROJECT_SECRET = json.load(jsonfile)['project']
 
+VALID_EMAIL_REGEX = re.compile(
+    '^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$')
+
 
 class UserBaseModel(BaseModel):
     email: str
@@ -35,20 +39,31 @@ class User():
     def __init__(self, email):
         self.email = email
         self.user_in_db = None
-        self.is_verified = False
+        self.verified = False
 
-    def insert(self, password):
+    def insert(self, password, redirect_to):
         """Inserts user into database if does not exist"""
         self.user_in_db = User.users_db.get(self.email)
         if self.user_in_db:
             return {'error': 'User already exists'}
 
+        validation = self.validate(password)
+
+        if validation:  # If dict is not empty
+            validation.update({'error': 'Validation errors'})
+            return validation
+
         password = passwords.encode_password(password)
 
-        self.user_in_db = {'key': self.email, 'password': password}
-        User.users_db.insert(self.user_in_db)
+        self.user_in_db = {
+            'key': self.email,
+            'password': password,
+            'verified': False,
+            'secret_token': secrets.token_hex(12)
+        }
+        User.users_db.insert(self.user_in_db, redirect_to)
 
-        return {'success': True}
+        return {'success': True, 'message': 'Please check your email'}
 
     def authenticate(self, password):
         """Authenticates user with login and password"""
@@ -57,6 +72,10 @@ class User():
         if not self.user_in_db:
             # User does not exist
             return {'error': 'Invalid email and password combination'}
+
+        if not self.user_in_db['verified']:
+            # User does not exist
+            return {'error': 'Email not verified'}
 
         output = self.verify_password(password)
         if 'error' in output:
@@ -109,6 +128,12 @@ class User():
         output = self.verify_password(old_password)
         if 'error' in output:
             return output
+
+        validation = self.validate(new_password)
+
+        if validation:  # If dict is not empty
+            validation.update({'error': 'Validation errors'})
+            return validation
 
         password = passwords.encode_password(new_password)
 
@@ -183,3 +208,59 @@ class User():
             return {'error': 'Invalid email and password combination'}
 
         return {'success': True}
+
+    def validate(self, password):
+        """Validates email and password"""
+
+        response = {}
+
+        if not VALID_EMAIL_REGEX.match(self.email):
+            response['email'] = 'not valid'
+
+        if len(password) < 8:
+            response['password'] = 'too short, must have at least 8 characters'
+
+        return response
+
+    def validate_email(self, token):
+        """Recieves the token for email validation"""
+        decoded_token = manage_tokens.decode(token)
+        if decoded_token is None:
+            return {'error': 'Token is invalid'}
+
+        self.user_in_db = User.users_db.get(self.email)
+        if not self.user_in_db:
+            # User does not exist
+            return {'error': 'User does not exist'}
+
+        if 'secret_token' not in decoded_token or decoded_token['secret_token'] != self.user_in_db['secret_token']:
+            return {'error': 'Token is invalid'}
+
+        self.user_in_db['secret_token'] = ''
+        self.user_in_db['verified'] = True
+
+        User.users_db.put(self.user_in_db)
+
+        return decoded_token
+
+    def send_verify_email(self, redirect_to):
+        """Sends and email to verify the user's address"""
+        if not self.user_in_db:
+            self.user_in_db = User.users_db.get(self.email)
+            if not self.user_in_db:
+                # User does not exist
+                return
+
+        if self.user_in_db['verified']:
+            return
+
+        if not self.user_in_db['secret_token']:
+            self.user_in_db['secret_token'] = secrets.token_hex(12)
+            User.users_db.put(self.user_in_db)
+
+        token = manage_tokens.encode({
+            'secret_token': self.user_in_db['secret_token'],
+            'redirect_to': redirect_to,
+        })
+
+        email_sender.welcome(self.email, token)

@@ -34,6 +34,24 @@ TEMPLATE_RECOVER_PASSWORD_HTML = """<h1>Recover password</h1>
 <p>This link will expire in two hours</p>
 <p>If you didn't request this, you can safely ignore this email</p>"""
 
+TEMPLATE_VALIDATE_EMAIL_PLAIN = """\
+VALIDATE EMAIL ADDRESS
+======================
+
+Welcome
+
+You are successfuly registered. Please click the following link to validate your email and activate your account
+
+%s
+
+If you didn't request this, you can safely ignore this email"""
+
+TEMPLATE_VALIDATE_EMAIL_HTML = """<h1>Validate email address</h1>
+<p>Welcome</p>
+<p>You are successfuly registered. Please click the following link to validate your email and activate your account</p>
+<p><a href="%s">%s</a></p>
+<p>If you didn't request this, you can safely ignore this email</p>"""
+
 
 APP_URL = f'https://{os.environ["DETA_PATH"]}.deta.dev'
 
@@ -98,6 +116,25 @@ def recover_password(email: str, token: str):
         recover_password_url, recover_password_url)
 
     subject = "Recover password"
+
+    send_email({
+        'recipient': email,
+        'plain': message_plain,
+        'html': message_html,
+        'subject': subject,
+    })
+
+
+def welcome(email: str, token: str):
+    """Sends an email welcoming user and with a link to validate email address"""
+
+    validate_email_url = f'{APP_URL}/users/validate_email?email={email}&token={token}'
+    message_plain = TEMPLATE_VALIDATE_EMAIL_PLAIN % validate_email_url
+
+    message_html = TEMPLATE_VALIDATE_EMAIL_HTML % (
+        validate_email_url, validate_email_url)
+
+    subject = "Welcome"
 
     send_email({
         'recipient': email,
